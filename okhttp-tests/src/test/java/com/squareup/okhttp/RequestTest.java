@@ -15,16 +15,22 @@
  */
 package com.squareup.okhttp;
 
+import com.squareup.okhttp.RequestBody.InputStreamFactory;
 import com.squareup.okhttp.internal.Util;
+
+import org.junit.Test;
+
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
+
 import okio.Buffer;
-import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -88,6 +94,24 @@ public final class RequestTest {
     assertEquals("Retransmit body", "616263", bodyToHex(body));
   }
 
+    @Test
+    public void inputStream() throws Exception {
+        MediaType contentType = MediaType.parse("text/plain");
+        final byte[] bytes = "abc".getBytes(Util.UTF_8);
+
+        RequestBody body = RequestBody.create(contentType, new InputStreamFactory() {
+            @Override
+            public InputStream create() {
+                return new ByteArrayInputStream(bytes);
+            }
+        }, bytes.length);
+
+        assertEquals(contentType, body.contentType());
+        assertEquals(bytes.length, body.contentLength());
+        assertEquals("616263", bodyToHex(body));
+        assertEquals("Retransmit body", "616263", bodyToHex(body));
+    }
+
   /** Common verbs used for apis such as GitHub, AWS, and Google Cloud. */
   @Test public void crudVerbs() throws IOException {
     MediaType contentType = MediaType.parse("application/json");
@@ -126,14 +150,14 @@ public final class RequestTest {
 
   @Test public void newBuilderUrlResetsUrl() throws Exception {
     Request requestWithoutCache = new Request.Builder().url("http://localhost/api").build();
-    Request builtRequestWithoutCache = requestWithoutCache.newBuilder().url("http://localhost/api/foo").build();
+    Request builtRequestWithoutCache = requestWithoutCache.newBuilder().url(
+            "http://localhost/api/foo").build();
     assertEquals(new URL("http://localhost/api/foo"), builtRequestWithoutCache.url());
 
     Request requestWithCache = new Request.Builder().url("http://localhost/api").build();
     // cache url object
     requestWithCache.url();
-    Request builtRequestWithCache = requestWithCache.newBuilder().url(
-        "http://localhost/api/foo").build();
+    Request builtRequestWithCache = requestWithCache.newBuilder().url("http://localhost/api/foo").build();
     assertEquals(new URL("http://localhost/api/foo"), builtRequestWithCache.url());
   }
 

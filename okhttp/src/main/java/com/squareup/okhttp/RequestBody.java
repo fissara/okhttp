@@ -16,9 +16,12 @@
 package com.squareup.okhttp;
 
 import com.squareup.okhttp.internal.Util;
+
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
+
 import okio.BufferedSink;
 import okio.ByteString;
 import okio.Okio;
@@ -55,6 +58,68 @@ public abstract class RequestBody {
     byte[] bytes = content.getBytes(charset);
     return create(contentType, bytes);
   }
+
+    /**
+     * Returns a new request body that transmits the contents of an {@code InputStream}.
+     *
+     * <p> Convenience for calling {@link #create(MediaType, InputStreamFactory, long)} with length
+     * {@code -1}. </p>
+     *
+     * @param streamFactory
+     *         Factory that produces an input stream on-demand. The factory may be called multiple
+     *         times to if a request is retried.
+     */
+    public static RequestBody create(final MediaType contentType,
+            final InputStreamFactory streamFactory) {
+        return create(contentType, streamFactory, -1);
+    }
+
+    /**
+     * Returns a new request body that transmits the contents of an {@code InputStream}.
+     *
+     * @param streamFactory
+     *         Factory that produces an input stream on-demand. The factory may be called multiple
+     *         times to if a request is retried.
+     * @param length
+     *         Length of the stream, or -1 if unknown.
+     * @see #create(MediaType, InputStreamFactory)
+     */
+    public static RequestBody create(final MediaType contentType,
+            final InputStreamFactory streamFactory,
+            final long length) {
+
+        if (streamFactory == null) {
+            throw new NullPointerException("streamFactory == null");
+        }
+
+        return new RequestBody() {
+            @Override
+            public MediaType contentType() {
+                return contentType;
+            }
+
+            @Override
+            public long contentLength() {
+                return length;
+            }
+
+            @Override
+            public void writeTo(BufferedSink sink) throws IOException {
+                InputStream inputStream = null;
+                Source source = null;
+                try {
+                    inputStream = streamFactory.create();
+                    if (inputStream == null) {
+                        throw new NullPointerException("inputStream == null");
+                    }
+                    source = Okio.source(inputStream);
+                    sink.writeAll(source);
+                } finally {
+                    Util.closeQuietly(source);
+                }
+            }
+        };
+    }
 
   /** Returns a new request body that transmits {@code content}. */
   public static RequestBody create(final MediaType contentType, final ByteString content) {
@@ -121,5 +186,9 @@ public abstract class RequestBody {
         }
       }
     };
+  }
+
+  public interface InputStreamFactory {
+    InputStream create();
   }
 }
